@@ -2,7 +2,7 @@
   "name": "GithubBot",
   "version": "1.0.0",
   "description": "",
-  "main": "gemini.js",
+  "main": "functionalbot.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon functionalbot.js"
