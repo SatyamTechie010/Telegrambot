@@ -1,7 +1,24 @@
 require("dotenv").config();
 
+const express = require("express");
 const { Telegraf, Markup } = require("telegraf");
 const { GoogleGenAI } = require("@google/genai");
+
+const app = express();
+
+
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("Telegram Gemini Bot is running on Render 🚀");
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Server is healthy",
+  });
+});
 
 if (!process.env.TOKEN) {
   throw new Error("TOKEN is missing in .env file");
@@ -13,7 +30,6 @@ if (!process.env.GEMINI_API_KEY) {
 
 const bot = new Telegraf(process.env.TOKEN);
 
-// Correct key name is apiKey, not apikey
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -39,7 +55,9 @@ function getUser(chatId) {
 }
 
 function getArgs(ctx) {
-  return ctx.message.text.replace(/^\/[a-zA-Z0-9_]+(@[a-zA-Z0-9_]+)?\s*/, "").trim();
+  return ctx.message.text
+    .replace(/^\/[a-zA-Z0-9_]+(@[a-zA-Z0-9_]+)?\s*/, "")
+    .trim();
 }
 
 function parseDateTime(input) {
@@ -136,9 +154,12 @@ Available Commands:
 /help - Show all commands
 /location - Send location
 /appointment YYYY-MM-DD HH:mm Purpose
+/appointments - View appointments
 /call YYYY-MM-DD HH:mm Topic
+/calls - View scheduled calls
 /remind 10m Message
 /remind YYYY-MM-DD HH:mm Message
+/reminders - View reminders
 /todo add Task
 /todo list
 /todo done 1
@@ -161,24 +182,33 @@ bot.help(async (ctx) => {
 1. Book Appointment:
    /appointment 2026-06-20 17:30 Doctor visit
 
-2. Schedule Call:
+2. View Appointments:
+   /appointments
+
+3. Schedule Call:
    /call 2026-06-20 18:00 React project discussion
 
-3. Set Reminder:
+4. View Calls:
+   /calls
+
+5. Set Reminder:
    /remind 10m Submit assignment
    /remind 2h Drink water
    /remind 2026-06-20 19:00 Pay college fee
 
-4. Todo List:
+6. View Reminders:
+   /reminders
+
+7. Todo List:
    /todo add Learn Telegraf
    /todo list
    /todo done 1
    /todo delete 1
 
-5. Location:
+8. Location:
    /location
 
-6. AI Chat:
+9. AI Chat:
    Just type any message normally.`
   );
 });
@@ -562,14 +592,30 @@ async function startBot() {
   ]);
 
   await bot.launch();
-
-  console.log("Bot is Running...");
 }
 
-startBot();
+// Start Express server and Telegram bot
+async function startServer() {
+  try {
+    app.listen(process.env.PORT, "0.0.0.0", () => {
+      console.log(`Express server running on PORT ${process.env.PORT}`);
+    });
+
+    await startBot();
+
+    console.log("Telegram bot is running...");
+  } catch (error) {
+    console.log("Server start error:", error.message);
+  }
+}
+
+startServer();
 
 // Graceful stop
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+process.once("SIGINT", () => {
+  bot.stop("SIGINT");
+});
 
-console.log("Bot is Running...");
+process.once("SIGTERM", () => {
+  bot.stop("SIGTERM");
+});
