@@ -6,6 +6,7 @@ const { GoogleGenAI } = require("@google/genai");
 
 const app = express();
 
+const PORT = process.env.PORT || 10040;
 
 app.use(express.json());
 
@@ -597,8 +598,8 @@ async function startBot() {
 // Start Express server and Telegram bot
 async function startServer() {
   try {
-    app.listen(process.env.PORT, "0.0.0.0", () => {
-      console.log(`Express server running on PORT ${process.env.PORT}`);
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Express server running on PORT ${PORT}`);
     });
 
     await startBot();
