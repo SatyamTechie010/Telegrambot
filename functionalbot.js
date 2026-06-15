@@ -10,6 +10,9 @@ const PORT = process.env.PORT || 10040;
 
 app.use(express.json());
 
+const TIMEZONE = process.env.TIMEZONE || "Asia/Kolkata";
+const TIMEZONE_OFFSET = process.env.TIMEZONE_OFFSET || "+05:30";
+
 app.get("/", (req, res) => {
   res.send("Telegram Gemini Bot is running on Render 🚀");
 });
@@ -18,6 +21,8 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
     message: "Server is healthy",
+    timezone: TIMEZONE,
+    currentTime: formatDate(new Date()),
   });
 });
 
@@ -36,7 +41,6 @@ const ai = new GoogleGenAI({
 });
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const TIMEZONE_OFFSET = process.env.TIMEZONE_OFFSET || "+05:30";
 
 // Temporary in-memory database
 // For production, use MongoDB/PostgreSQL because this data resets when server restarts.
@@ -71,6 +75,7 @@ function parseDateTime(input) {
   const timePart = match[2];
   const message = match[3];
 
+  // India timezone fixed offset
   const date = new Date(`${datePart}T${timePart}:00${TIMEZONE_OFFSET}`);
 
   if (isNaN(date.getTime())) return null;
@@ -108,8 +113,30 @@ function parseRelativeReminder(input) {
 
 function formatDate(date) {
   return date.toLocaleString("en-IN", {
+    timeZone: TIMEZONE,
     dateStyle: "medium",
     timeStyle: "short",
+    hour12: true,
+  });
+}
+
+function formatOnlyDate(date) {
+  return date.toLocaleDateString("en-IN", {
+    timeZone: TIMEZONE,
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function formatOnlyTime(date) {
+  return date.toLocaleTimeString("en-IN", {
+    timeZone: TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
   });
 }
 
@@ -145,6 +172,19 @@ async function askGemini(prompt) {
   return response.text || "No response generated.";
 }
 
+async function handleCurrentTime(ctx) {
+  const now = new Date();
+
+  await ctx.reply(
+    `Current Date & Time
+
+Date: ${formatOnlyDate(now)}
+Time: ${formatOnlyTime(now)}
+Full: ${formatDate(now)}
+Timezone: ${TIMEZONE}`
+  );
+}
+
 // Start command
 bot.start(async (ctx) => {
   await ctx.reply(
@@ -153,6 +193,9 @@ bot.start(async (ctx) => {
 Available Commands:
 
 /help - Show all commands
+/time - Show current time
+/date - Show current date
+/now - Show current date and time
 /location - Send location
 /appointment YYYY-MM-DD HH:mm Purpose
 /appointments - View appointments
@@ -168,9 +211,10 @@ Available Commands:
 
 You can also send any normal message and I will reply using Gemini AI.`,
     Markup.keyboard([
-      ["📅 Book Appointment", "📞 Schedule Call"],
-      ["⏰ Reminder", "✅ Todo List"],
-      ["📍 Location", "🤖 Ask AI"],
+      ["🕒 Current Time", "📅 Book Appointment"],
+      ["📞 Schedule Call", "⏰ Reminder"],
+      ["✅ Todo List", "📍 Location"],
+      ["🤖 Ask AI"],
     ]).resize()
   );
 });
@@ -180,39 +224,49 @@ bot.help(async (ctx) => {
   await ctx.reply(
     `Bot Command Guide:
 
-1. Book Appointment:
+1. Current Date & Time:
+   /time
+   /date
+   /now
+
+2. Book Appointment:
    /appointment 2026-06-20 17:30 Doctor visit
 
-2. View Appointments:
+3. View Appointments:
    /appointments
 
-3. Schedule Call:
+4. Schedule Call:
    /call 2026-06-20 18:00 React project discussion
 
-4. View Calls:
+5. View Calls:
    /calls
 
-5. Set Reminder:
+6. Set Reminder:
    /remind 10m Submit assignment
    /remind 2h Drink water
    /remind 2026-06-20 19:00 Pay college fee
 
-6. View Reminders:
+7. View Reminders:
    /reminders
 
-7. Todo List:
+8. Todo List:
    /todo add Learn Telegraf
    /todo list
    /todo done 1
    /todo delete 1
 
-8. Location:
+9. Location:
    /location
 
-9. AI Chat:
+10. AI Chat:
    Just type any message normally.`
   );
 });
+
+// Current date and time commands
+bot.command("time", handleCurrentTime);
+bot.command("date", handleCurrentTime);
+bot.command("now", handleCurrentTime);
 
 // Location command
 bot.command("location", async (ctx) => {
@@ -505,6 +559,8 @@ bot.command("todo", async (ctx) => {
 });
 
 // Button text handlers
+bot.hears("🕒 Current Time", handleCurrentTime);
+
 bot.hears("📅 Book Appointment", async (ctx) => {
   await ctx.reply(
     `Use this format:
@@ -582,6 +638,9 @@ async function startBot() {
   await bot.telegram.setMyCommands([
     { command: "start", description: "Start bot" },
     { command: "help", description: "Show help menu" },
+    { command: "time", description: "Show current time" },
+    { command: "date", description: "Show current date" },
+    { command: "now", description: "Show current date and time" },
     { command: "location", description: "Send location" },
     { command: "appointment", description: "Book appointment" },
     { command: "appointments", description: "View appointments" },
